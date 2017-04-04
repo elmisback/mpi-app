@@ -1,0 +1,102 @@
+<canvas id="mpi-canvas" style="width:100%; height:100%">
+<script>
+  var get_peaks = function(data) {
+    // return indices of peaks
+    var peaks = [];
+    for (var i=0; i < data.length; i++) {
+      if (i > 0 && i < data.length - 1 &&
+          Math.abs(data[i]) > Math.abs(data[i-1]) &&
+          Math.abs(data[i]) > Math.abs(data[i+1])) {
+        peaks.push(i);
+      }
+    }
+    return peaks;
+  };
+  var index_filter = function(A, indices) {
+    var B = new Array(indices.length);
+    for (var i=0; i < indices.length; i++) {
+      B[i] = A[indices[i]];
+    }
+    return B;
+  };
+
+  var order_n_peaks = function(A, n) {
+    // Gets the n-th order peak indices
+  };
+
+  var chunk_peaks = function(A, chunksize) {
+    var peaks = new Array(A.length / chunksize);
+    for (var i=0; i * chunksize < A.length; i++) {  //chunk_i
+      var max = 0;
+      var max_j = 0;
+      var start = i * chunksize;
+      for (var j=start; (j < start + chunksize) && (j < A.length); j++) {
+        if (Math.abs(A[j]) > max) {
+          max = Math.abs(A[j]);
+          max_j = j;
+        }
+      }
+      peaks[i] = max_j;
+    }
+    return peaks;
+  };
+
+  var graph = function(data) {
+    var canvas = document.getElementById("mpi-canvas");
+    // TODO figure out how to scale properly.
+    canvas.width=700;
+    canvas.height=700;
+    var ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.moveTo(0, canvas.height);
+    ctx.beginPath();
+    var chunksize = 1024;  // Width (in frames) of a chunk.
+    var gain = 700;
+    var peaks = chunk_peaks(data, chunksize);
+    //peaks = get_peaks(data);  //indices
+    //peaks_of_peaks = get_peaks(index_filter(data, peaks));
+    for (var i=0; i < peaks.length; i++) {
+      var j = peaks[i];
+      var h = canvas.height - Math.abs(data[j] * gain);
+      var w = j * (canvas.width / data.length);
+      //ctx.fillRect(w, h, 1, 1);
+      ctx.lineTo(w, h);
+    }
+      //ctx.moveTo(w, canvas.height);  // First point (if not origin)
+    ctx.stroke();  // Draw it
+    //ctx.lineWidth=".5";
+    //ctx.strokeStyle="green"; // Green path
+  };
+
+  var size = 1024;  // Interval width: number of frames processed on each callback.
+  var steps = 170;  // Intervals shown on the screen.
+  var data = new Float32Array(size * steps);
+  data.fill(0);
+  var handleSuccess = function(stream) {
+    console.log('testing!');
+    var context = new AudioContext();
+    var input = context.createMediaStreamSource(stream)
+    var processor = context.createScriptProcessor(size,1,1);
+    input.connect(processor);
+
+    console.log(context);
+    processor.connect(context.destination);
+    /*
+    //var steps = 10;
+    */
+
+     // console.log('heyo');
+    processor.onaudioprocess = function(e){
+      // Do something with the data, i.e Convert this to WAV
+      samples = e.inputBuffer.getChannelData(0);
+      //console.log(samples);
+      var i = (steps - 1) * size;
+      data.set(data.subarray(size));
+      data.set(samples, i);
+      //data = data.slice(size).concat(Array.prototype.slice.call(samples));
+      graph(data);
+    };
+  };
+
+  navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(handleSuccess);
+</script>
