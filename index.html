@@ -41,6 +41,43 @@
     return peaks;
   };
 
+  var interval_color = function(interval) {
+    return "Red";
+  };
+
+  var paint_intervals = function(intervals) {
+    var canvas = document.getElementById("mpi-canvas");
+    var ctx = canvas.getContext("2d");
+    for (var i=0; i < intervals.length; i++) {
+      x1 = canvas.width/n_frames * intervals[i][0];
+      x2 = canvas.width/n_frames * intervals[i][1];
+      ctx.fillStyle = interval_color(intervals[i]);
+      ctx.fillRect(x1, 0, x2 - x1, canvas.height);
+      ctx.stroke();
+    }
+  };
+
+  var phonation_intervals = function(data) {
+    // finds phonation intervals in data based on a threshold
+    var intervals = [];
+    var curr = null;
+    var threshold = .07;
+    for (var i=0; i < data.length; i++) {
+      var v = Math.abs(data[i]);
+      if ((!curr) && (v > threshold)) {
+          curr = [i, null];
+      } else if (curr && (v < threshold)) {
+          curr[1] = i - 1;
+          intervals.push(curr.slice(0));
+          curr = null;
+      }
+    }
+    console.log(intervals);
+    console.log(intervals.length);
+    return intervals;
+  }
+
+
   var graph = function(data) {
     var canvas = document.getElementById("mpi-canvas");
     // TODO figure out how to scale properly.
@@ -48,29 +85,40 @@
     canvas.height=700;
     var ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.moveTo(0, canvas.height);
-    ctx.beginPath();
-    var chunksize = 1024;  // Width (in frames) of a chunk.
-    var gain = 700;
-    var peaks = chunk_peaks(data, chunksize);
-    //peaks = get_peaks(data);  //indices
-    //peaks_of_peaks = get_peaks(index_filter(data, peaks));
+    var intervals = phonation_intervals(data);
+    paint_intervals(intervals);
+    ctx.fillStyle= "black";
+    var gain = 800;
+    //ctx.moveTo(0, canvas.height);
+    //ctx.beginPath();
+    //var chunksize = 1024;  // Width (in frames) of a chunk.
+    //var peaks = chunk_peaks(data, chunksize);
+    ////peaks = get_peaks(data);  //indices
+    ////peaks_of_peaks = get_peaks(index_filter(data, peaks));
+    //for (var i=0; i < peaks.length; i++) {
+    //  var j = peaks[i];
+    //  var h = canvas.height - Math.abs(data[j] * gain);
+    //  var w = j * (canvas.width / data.length);
+    //  //ctx.fillRect(w, h, 1, 1);
+    //  ctx.lineTo(w, h);
+    //}
+    var peaks = get_peaks(data);
     for (var i=0; i < peaks.length; i++) {
       var j = peaks[i];
       var h = canvas.height - Math.abs(data[j] * gain);
       var w = j * (canvas.width / data.length);
-      //ctx.fillRect(w, h, 1, 1);
-      ctx.lineTo(w, h);
+      ctx.fillRect(w, h, 1, h);
     }
       //ctx.moveTo(w, canvas.height);  // First point (if not origin)
+    //ctx.strokeStyle="green"; // Green path
     ctx.stroke();  // Draw it
     //ctx.lineWidth=".5";
-    //ctx.strokeStyle="green"; // Green path
   };
 
   var size = 1024;  // Interval width: number of frames processed on each callback.
-  var steps = 170;  // Intervals shown on the screen.
-  var data = new Float32Array(size * steps);
+  var steps = 40;  // Intervals shown on the screen.
+  var n_frames = size * steps;
+  var data = new Float32Array(n_frames);
   data.fill(0);
   var handleSuccess = function(stream) {
     console.log('testing!');
