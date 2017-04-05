@@ -83,18 +83,44 @@
     return density;
   };
 
+  var crossing_density = function(data) {
+    // Yields an array with the density of crossings.
+    var N = 900;  // Unit size.
+    var density = new Array(data.length);
+    density.fill(0);
+
+    // NOTE could maybe do this in one pass.
+
+    // Are data entries above threshold?
+    var crossing = new Array(data.length);
+    for (var i=0; i < data.length - 1; i++) {
+      crossing[i] = (data[i] == 0
+                     || (data[i] < 0 && data[i+1] > 0)
+                     || (data[i] > 0 && data[i+1] < 0)) ? 1 : 0;
+    }
+
+    for (var i=0; i < N; i++) { // get first unit density.
+      density[0] += crossing[i];
+    }
+
+    for (var i=N; i < data.length; i++) {
+      density[i - N + 1] = density[i - N] + crossing[i] - crossing[i - N];
+    }
+    return density;
+  };
+
   var phonation_intervals = function(data) {
     // finds phonation intervals in data based on a threshold
-    var density = phonation_density(data);
+    var density = crossing_density(data);
     console.log(density);
     var intervals = [];
     var curr = null;
-    var min_density = 20;
+    var max_density = 60;
     for (var i=0; i < density.length; i++) {
       var v = density[i];
-      if ((!curr) && (v > min_density)) {
+      if ((!curr) && (v < max_density)) {
           curr = [i, null];
-      } else if (curr && (v < min_density)) {
+      } else if (curr && (v > max_density || i == density.length - 1)) {
           curr[1] = i - 1;
           intervals.push(curr.slice(0));
           curr = null;
@@ -103,7 +129,29 @@
     //console.log(intervals);
     //console.log(intervals.length);
     return intervals;
-  }
+  };
+
+  //var phonation_intervals = function(data) {
+  //  // finds phonation intervals in data based on a threshold
+  //  var density = phonation_density(data);
+  //  console.log(density);
+  //  var intervals = [];
+  //  var curr = null;
+  //  var min_density = 20;
+  //  for (var i=0; i < density.length; i++) {
+  //    var v = density[i];
+  //    if ((!curr) && (v > min_density)) {
+  //        curr = [i, null];
+  //    } else if (curr && (v < min_density)) {
+  //        curr[1] = i - 1;
+  //        intervals.push(curr.slice(0));
+  //        curr = null;
+  //    }
+  //  }
+  //  //console.log(intervals);
+  //  //console.log(intervals.length);
+  //  return intervals;
+  //}
 
 
   var graph = function(data) {
@@ -144,7 +192,7 @@
   };
 
   var size = 1024;  // Interval width: number of frames processed on each callback.
-  var steps = 45;  // Intervals shown on the screen.
+  var steps = 40;  // Intervals shown on the screen.
   var n_frames = size * steps;
   var data = new Float32Array(n_frames);
   data.fill(0);
