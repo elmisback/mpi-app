@@ -57,23 +57,51 @@
     }
   };
 
+  var phonation_density = function(data) {
+    // Yields an array with the density of above-threshold frames.
+    var N = 900;  // above-threshold per this many frames.
+    var threshold = .15;
+    var density = new Array(data.length);
+    density.fill(0);
+
+    // NOTE could maybe do this in one pass.
+
+    // Are data entries above threshold?
+    var above = new Array(data.length);
+    for (var i=0; i < data.length; i++) {
+      above[i] = (Math.abs(data[i]) > threshold) ? 1 : 0;
+    }
+
+    for (var i=0; i < N; i++) { // get first unit density.
+      density[0] += above[i];
+    }
+
+    for (var i=N; i < data.length; i++) {
+      density[i - N + 1] = density[i - N] + above[i] - above[i - N];
+    }
+    console.log(density);
+    return density;
+  };
+
   var phonation_intervals = function(data) {
     // finds phonation intervals in data based on a threshold
+    var density = phonation_density(data);
+    console.log(density);
     var intervals = [];
     var curr = null;
-    var threshold = .07;
-    for (var i=0; i < data.length; i++) {
-      var v = Math.abs(data[i]);
-      if ((!curr) && (v > threshold)) {
+    var min_density = 20;
+    for (var i=0; i < density.length; i++) {
+      var v = density[i];
+      if ((!curr) && (v > min_density)) {
           curr = [i, null];
-      } else if (curr && (v < threshold)) {
+      } else if (curr && (v < min_density)) {
           curr[1] = i - 1;
           intervals.push(curr.slice(0));
           curr = null;
       }
     }
-    console.log(intervals);
-    console.log(intervals.length);
+    //console.log(intervals);
+    //console.log(intervals.length);
     return intervals;
   }
 
@@ -116,7 +144,7 @@
   };
 
   var size = 1024;  // Interval width: number of frames processed on each callback.
-  var steps = 40;  // Intervals shown on the screen.
+  var steps = 45;  // Intervals shown on the screen.
   var n_frames = size * steps;
   var data = new Float32Array(n_frames);
   data.fill(0);
