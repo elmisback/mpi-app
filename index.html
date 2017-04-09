@@ -60,7 +60,7 @@
   var phonation_density = function(data) {
     // Yields an array with the density of above-threshold frames.
     var N = 900;  // above-threshold per this many frames.
-    var threshold = .15;
+    var threshold = .03;
     var density = new Array(data.length);
     density.fill(0);
 
@@ -109,40 +109,18 @@
     return density;
   };
 
-  var phonation_intervals = function(data) {
-    // finds phonation intervals in data based on a threshold
-    var density = crossing_density(data);
-    console.log(density);
-    var intervals = [];
-    var curr = null;
-    var max_density = 60;
-    for (var i=0; i < density.length; i++) {
-      var v = density[i];
-      if ((!curr) && (v < max_density)) {
-          curr = [i, null];
-      } else if (curr && (v > max_density || i == density.length - 1)) {
-          curr[1] = i - 1;
-          intervals.push(curr.slice(0));
-          curr = null;
-      }
-    }
-    //console.log(intervals);
-    //console.log(intervals.length);
-    return intervals;
-  };
-
   //var phonation_intervals = function(data) {
   //  // finds phonation intervals in data based on a threshold
-  //  var density = phonation_density(data);
+  //  var density = crossing_density(data);
   //  console.log(density);
   //  var intervals = [];
   //  var curr = null;
-  //  var min_density = 20;
+  //  var max_density = 60;
   //  for (var i=0; i < density.length; i++) {
   //    var v = density[i];
-  //    if ((!curr) && (v > min_density)) {
+  //    if ((!curr) && (v < max_density)) {
   //        curr = [i, null];
-  //    } else if (curr && (v < min_density)) {
+  //    } else if (curr && (v > max_density || i == density.length - 1)) {
   //        curr[1] = i - 1;
   //        intervals.push(curr.slice(0));
   //        curr = null;
@@ -151,7 +129,29 @@
   //  //console.log(intervals);
   //  //console.log(intervals.length);
   //  return intervals;
-  //}
+  //};
+
+  var phonation_intervals = function(data) {
+    // finds phonation intervals in data based on a threshold
+    var density = phonation_density(data);
+    console.log(density);
+    var intervals = [];
+    var curr = null;
+    var min_density = 20;
+    for (var i=0; i < density.length; i++) {
+      var v = density[i];
+      if ((!curr) && (v > min_density)) {
+          curr = [i, null];
+      } else if (curr && (v < min_density)) {
+          curr[1] = i - 1;
+          intervals.push(curr.slice(0));
+          curr = null;
+      }
+    }
+    //console.log(intervals);
+    //console.log(intervals.length);
+    return intervals;
+  }
 
 
   var graph = function(data) {
@@ -192,16 +192,21 @@
   };
 
   var size = 1024;  // Interval width: number of frames processed on each callback.
-  var steps = 40;  // Intervals shown on the screen.
+  var steps = 95;  // Intervals shown on the screen.
   var n_frames = size * steps;
   var data = new Float32Array(n_frames);
   data.fill(0);
+  var context;
   var handleSuccess = function(stream) {
     console.log('testing!');
-    var context = new AudioContext();
+    context = new AudioContext();
     var input = context.createMediaStreamSource(stream)
     var processor = context.createScriptProcessor(size,1,1);
-    input.connect(processor);
+    var filter = context.createBiquadFilter();
+    input.connect(filter);
+    filter.connect(processor);
+    filter.type = "lowpass";
+    filter.frequency = 440;
 
     console.log(context);
     processor.connect(context.destination);
