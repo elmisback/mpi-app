@@ -2,12 +2,12 @@
 <script>
 
 // Global variables.
-  var size = 1024;  // Interval width: number of frames processed on each callback.
-  var steps = 95;  // Intervals shown on the screen.
-  var n_frames = size * steps;
-  var data = new Float32Array(n_frames);
+  var step = 0;
+  var fps = 1024;  // Frames per step (one step per event).
+  var steps_shown = 95;  // Intervals shown on the screen.
+  var frames_shown = fps * steps_shown;
+  var data = new Float32Array(frames_shown);
   data.fill(0);
-  var context;
 
 // Helper functions.
   var get_peaks = function(data) {
@@ -31,8 +31,8 @@
     var canvas = document.getElementById("mpi-canvas");
     var ctx = canvas.getContext("2d");
     for (var i=0; i < intervals.length; i++) {
-      x1 = canvas.width/n_frames * intervals[i][0];
-      x2 = canvas.width/n_frames * intervals[i][1];
+      x1 = canvas.width/frames_shown * intervals[i][0];
+      x2 = canvas.width/frames_shown * intervals[i][1];
       ctx.fillStyle = interval_color(intervals[i]);
       ctx.fillRect(x1, 0, x2 - x1, canvas.height);
       ctx.stroke();
@@ -112,9 +112,9 @@
 
 // Initialization function.
   var handleSuccess = function(stream) {
-    context = new AudioContext();
+    var context = new AudioContext();
     var input = context.createMediaStreamSource(stream)
-    var processor = context.createScriptProcessor(size,1,1);
+    var processor = context.createScriptProcessor(fps,1,1);
     var filter = context.createBiquadFilter();
     input.connect(filter);
     filter.connect(processor);
@@ -130,10 +130,10 @@
   var process_audio = function(e) {
     samples = e.inputBuffer.getChannelData(0);
     //console.log(samples);
-    var i = (steps - 1) * size;
-    data.set(data.subarray(size));
+    var i = (steps_shown - 1) * fps;
+    data.set(data.subarray(fps));
     data.set(samples, i);
-    //data = data.slice(size).concat(Array.prototype.slice.call(samples));
+    //data = data.slice(fps).concat(Array.prototype.slice.call(samples));
     graph(data);
   };
 
