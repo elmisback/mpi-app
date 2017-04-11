@@ -1,5 +1,15 @@
 <canvas id="mpi-canvas" style="width:100%; height:100%">
 <script>
+
+// Global variables.
+  var size = 1024;  // Interval width: number of frames processed on each callback.
+  var steps = 95;  // Intervals shown on the screen.
+  var n_frames = size * steps;
+  var data = new Float32Array(n_frames);
+  data.fill(0);
+  var context;
+
+// Helper functions.
   var get_peaks = function(data) {
     // return indices of peaks
     var peaks = [];
@@ -9,34 +19,6 @@
           Math.abs(data[i]) > Math.abs(data[i+1])) {
         peaks.push(i);
       }
-    }
-    return peaks;
-  };
-  var index_filter = function(A, indices) {
-    var B = new Array(indices.length);
-    for (var i=0; i < indices.length; i++) {
-      B[i] = A[indices[i]];
-    }
-    return B;
-  };
-
-  var order_n_peaks = function(A, n) {
-    // Gets the n-th order peak indices
-  };
-
-  var chunk_peaks = function(A, chunksize) {
-    var peaks = new Array(A.length / chunksize);
-    for (var i=0; i * chunksize < A.length; i++) {  //chunk_i
-      var max = 0;
-      var max_j = 0;
-      var start = i * chunksize;
-      for (var j=start; (j < start + chunksize) && (j < A.length); j++) {
-        if (Math.abs(A[j]) > max) {
-          max = Math.abs(A[j]);
-          max_j = j;
-        }
-      }
-      peaks[i] = max_j;
     }
     return peaks;
   };
@@ -83,54 +65,6 @@
     return density;
   };
 
-  var crossing_density = function(data) {
-    // Yields an array with the density of crossings.
-    var N = 900;  // Unit size.
-    var density = new Array(data.length);
-    density.fill(0);
-
-    // NOTE could maybe do this in one pass.
-
-    // Are data entries above threshold?
-    var crossing = new Array(data.length);
-    for (var i=0; i < data.length - 1; i++) {
-      crossing[i] = (data[i] == 0
-                     || (data[i] < 0 && data[i+1] > 0)
-                     || (data[i] > 0 && data[i+1] < 0)) ? 1 : 0;
-    }
-
-    for (var i=0; i < N; i++) { // get first unit density.
-      density[0] += crossing[i];
-    }
-
-    for (var i=N; i < data.length; i++) {
-      density[i - N + 1] = density[i - N] + crossing[i] - crossing[i - N];
-    }
-    return density;
-  };
-
-  //var phonation_intervals = function(data) {
-  //  // finds phonation intervals in data based on a threshold
-  //  var density = crossing_density(data);
-  //  console.log(density);
-  //  var intervals = [];
-  //  var curr = null;
-  //  var max_density = 60;
-  //  for (var i=0; i < density.length; i++) {
-  //    var v = density[i];
-  //    if ((!curr) && (v < max_density)) {
-  //        curr = [i, null];
-  //    } else if (curr && (v > max_density || i == density.length - 1)) {
-  //        curr[1] = i - 1;
-  //        intervals.push(curr.slice(0));
-  //        curr = null;
-  //    }
-  //  }
-  //  //console.log(intervals);
-  //  //console.log(intervals.length);
-  //  return intervals;
-  //};
-
   var phonation_intervals = function(data) {
     // finds phonation intervals in data based on a threshold
     var density = phonation_density(data);
@@ -153,7 +87,6 @@
     return intervals;
   }
 
-
   var graph = function(data) {
     var canvas = document.getElementById("mpi-canvas");
     // TODO figure out how to scale properly.
@@ -165,19 +98,7 @@
     paint_intervals(intervals);
     ctx.fillStyle= "black";
     var gain = 800;
-    //ctx.moveTo(0, canvas.height);
-    //ctx.beginPath();
-    //var chunksize = 1024;  // Width (in frames) of a chunk.
-    //var peaks = chunk_peaks(data, chunksize);
-    ////peaks = get_peaks(data);  //indices
-    ////peaks_of_peaks = get_peaks(index_filter(data, peaks));
-    //for (var i=0; i < peaks.length; i++) {
-    //  var j = peaks[i];
-    //  var h = canvas.height - Math.abs(data[j] * gain);
-    //  var w = j * (canvas.width / data.length);
-    //  //ctx.fillRect(w, h, 1, 1);
-    //  ctx.lineTo(w, h);
-    //}
+    // NOTE We're still only plotting peaks
     var peaks = get_peaks(data);
     for (var i=0; i < peaks.length; i++) {
       var j = peaks[i];
@@ -185,20 +106,12 @@
       var w = j * (canvas.width / data.length);
       ctx.fillRect(w, h, 1, h);
     }
-      //ctx.moveTo(w, canvas.height);  // First point (if not origin)
-    //ctx.strokeStyle="green"; // Green path
     ctx.stroke();  // Draw it
-    //ctx.lineWidth=".5";
   };
 
-  var size = 1024;  // Interval width: number of frames processed on each callback.
-  var steps = 95;  // Intervals shown on the screen.
-  var n_frames = size * steps;
-  var data = new Float32Array(n_frames);
-  data.fill(0);
-  var context;
+
+// Initialization function.
   var handleSuccess = function(stream) {
-    console.log('testing!');
     context = new AudioContext();
     var input = context.createMediaStreamSource(stream)
     var processor = context.createScriptProcessor(size,1,1);
@@ -210,22 +123,20 @@
 
     console.log(context);
     processor.connect(context.destination);
-    /*
-    //var steps = 10;
-    */
-
-     // console.log('heyo');
-    processor.onaudioprocess = function(e){
-      // Do something with the data, i.e Convert this to WAV
-      samples = e.inputBuffer.getChannelData(0);
-      //console.log(samples);
-      var i = (steps - 1) * size;
-      data.set(data.subarray(size));
-      data.set(samples, i);
-      //data = data.slice(size).concat(Array.prototype.slice.call(samples));
-      graph(data);
-    };
+    processor.onaudioprocess = process_audio;
   };
 
+// Main loop.
+  var process_audio = function(e) {
+    samples = e.inputBuffer.getChannelData(0);
+    //console.log(samples);
+    var i = (steps - 1) * size;
+    data.set(data.subarray(size));
+    data.set(samples, i);
+    //data = data.slice(size).concat(Array.prototype.slice.call(samples));
+    graph(data);
+  };
+
+// Get audio permission and start graphing!
   navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(handleSuccess);
 </script>
