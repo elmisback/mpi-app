@@ -31,6 +31,9 @@ var bin_colors = [
   '#4a0082',
   '#490080']
 
+var histogram_painting_freq = 200;
+var hist_counter = 0;
+
 class Interval {
   constructor(args) {
     args = args || {};
@@ -124,6 +127,23 @@ var paint_intervals = function(intervals) {
   }
 };
 
+var paint_histogram = (canvas, bin_counts) => {
+  var ctx = canvas.getContext("2d");
+  ctx.fillStyle = "Black";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.stroke();
+  var N = bin_counts.length;
+  var max = bin_counts.reduce((a, b) => Math.max(a, b), 0);
+  if (max == 0) return;
+  var w = canvas.width / N;
+  for (let i=0; i < N; i++) {
+    ctx.fillStyle = bin_colors[i];
+    var h = canvas.height * bin_counts[i] / max;
+    ctx.fillRect(i * w, canvas.height - h, w, h);
+  }
+  ctx.stroke();  // Draw
+};
+
 var interval_join = (L, R) => {
   if (L.length == 0) {
     return R;
@@ -167,10 +187,12 @@ var init = function(stream) {
 
   // Set the scrolling speed
   sampleRate = context.sampleRate;
-  var T = fps/sampleRate * 1.75;
+  var scale = 1.3; // Adjusts speed
+  var T = fps/sampleRate * scale;
 
   // 4 seconds shown
   steps_shown = Math.floor(4/T);
+  console.log(steps_shown);
 
   //10 minutes saved
   interval_steps_saved = Math.floor(10 * 60 / T);
@@ -188,6 +210,7 @@ var init = function(stream) {
 
   processor.connect(context.destination);
   processor.onaudioprocess = process_audio;
+  paint_histogram(document.getElementById("stats"), bin_counts);
 };
 
 // Main loop.
@@ -198,14 +221,28 @@ var process_audio = e => {
   // Add a new interval if any frame is greater than a threshold.
   var threshold = .03;
   if (Array.from(new_frames).some(v => v > threshold)) {
+    var old_len = intervals.length;
+    if (intervals.length > 0) {
+      var old_last_bin = intervals[intervals.length - 1].bin;
+    }
     intervals = interval_join(intervals, [new Interval()]);
-    // TODO calc stats with new interval -- account for join!
+    var new_last_bin = intervals[intervals.length - 1].bin;
+    if (old_len == intervals.length) {
+      // Account for possible join.
+      bin_counts[old_last_bin] -= 1;
+      bin_counts[new_last_bin] += 1;
+    } else {
+      bin_counts[new_last_bin] += 1;
+    }
   }
 
-  // TODO calc stats from dropped intervals
   if (intervals.length > 0) {
     var idx = intervals_from_step(intervals, step - interval_steps_saved + 1);
     var dropped = intervals.slice(0, idx);
+    // TODO calc stats from dropped intervals
+    for (let v of dropped) {
+      bin_counts[v.bin] -= 1;
+    }
     intervals = intervals.slice(idx);
   }
 
@@ -224,6 +261,11 @@ var process_audio = e => {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   paint_intervals(intervals);
   paint_frames(frames);
+  hist_counter += 1;
+  if (hist_counter == histogram_painting_freq) {
+    paint_histogram(document.getElementById("stats"), bin_counts);
+    hist_counter = 0;
+  }
 
   step += 1;
 };
