@@ -1,12 +1,13 @@
 // Global variables.
 var step = 0;
 var fps = 1024;  // Frames per step (one step per event).
-//var steps_shown = 95;  // Intervals shown on the screen.
-var steps_shown;
+var scrollSpeed = 1.3; // Adjusts speed
 
-var interval_steps_saved;  // Length of intervals *in steps*
+var steps_shown; // Intervals shown on the screen; initialized below.
 
-var frames;
+var interval_steps_saved;  // Length of intervals *in steps*; initialized below.
+
+var frames; // The shown frames buffer.
 
 var intervals = [];
 
@@ -164,20 +165,6 @@ var interval_join = (L, R) => {
     R.shift();
   }
 
-  ///* Check for
-  // * 1. left is past the end
-  // * 2. right starts at 0
-  // * 3. step of end of left is step of right
-  // */
-  //if (l.end >= fps
-  //    && r.start == 0
-  //    && (l.step + l.end/fps == r.step)) {
-
-  //  // Add the end of r to the end of l
-  //  l.end += r.end;
-  //  // Drop r from R
-  //  R.shift();
-  //}
   return L.concat(R);
 };
 
@@ -187,8 +174,7 @@ var init = function(stream) {
 
   // Set the scrolling speed
   sampleRate = context.sampleRate;
-  var scale = 1.3; // Adjusts speed
-  var T = fps/sampleRate * scale;
+  var T = fps/sampleRate * scrollSpeed;
 
   // 4 seconds shown
   steps_shown = Math.floor(4/T);
@@ -239,7 +225,6 @@ var process_audio = e => {
   if (intervals.length > 0) {
     var idx = intervals_from_step(intervals, step - interval_steps_saved + 1);
     var dropped = intervals.slice(0, idx);
-    // TODO calc stats from dropped intervals
     for (let v of dropped) {
       bin_counts[v.bin] -= 1;
     }
